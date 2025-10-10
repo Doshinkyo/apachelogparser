@@ -1,6 +1,6 @@
 # Apache Log Parser
 
-A simple web-based tool for parsing Apache log files and displaying the results in a searchable, filterable table. Supports drag-and-drop file upload, column filtering, error highlighting, and CSV export.
+A simple web-based tool for parsing Apache log files and displaying the results in a filterable table that can be copied to the clipboard. Supports drag-and-drop file upload, column filtering, error highlighting, and CSV downloading of the resulting parsed data table as a csv file.
 
 ## Features
 
