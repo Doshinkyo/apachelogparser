@@ -15,6 +15,8 @@ A simple web-based tool for parsing Apache log files and displaying the results 
 
 [Try it online at apachelogparser.com](https://www.apachelogparser.com)
 
+![Web App Screenshot](assets/screenshot.png)
+
 ## Usage
 
 1. Open the website or clone this repository.
