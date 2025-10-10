@@ -21,6 +21,4 @@ A simple web-based tool for parsing Apache log files and displaying the results 
 2. Drag and drop your Apache log file or use the file selector.
 3. Use the available filters and options to view and export your data.
 
-## License
 
-MIT License
