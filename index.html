@@ -1,18 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
-    <title>Apache Log Parser</title>
+    <title>Apache Log Parser: Drag, Drop, Format, View, Copy & Download</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- Language Declaration -->
     <meta http-equiv="Content-Language" content="en" />
     <!-- SEO Meta Tags -->
-    <meta name="description" content="A tool to rapidly parse Apache access log files into a table with filtering, copy, and download functionality.">
+    <meta name="description"
+        content="A tool to rapidly parse Apache access log files into a table with filtering, copy, and download functionality.">
     <meta name="keywords" content="Apache, access log, parser, table, filter, copy, download, CSV, web tool">
     <meta name="author" content="ResonanceIT.co.uk">
     <meta name="robots" content="index, follow">
     <!-- Open Graph Meta Tags -->
-     <meta property="og:title" content="Apache Log Parser" />
+    <meta property="og:title" content="Apache Log Parser" />
     <meta property="og:description" content="Parse Apache access logs into filterable tables with export options." />
     <meta property="og:url" content="https://apachelogparser.com" />
     <meta property="og:type" content="website" />
@@ -23,77 +25,113 @@
     <!-- Twitter Card Meta Tags -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Apache Log Parser">
-    <meta name="twitter:description" content="A tool to rapidly parse Apache access log files into a table with filtering, copy, and download functionality.">
+    <meta name="twitter:description"
+        content="A tool to rapidly parse Apache access log files into a table with filtering, copy, and download functionality.">
     <meta name="twitter:image" content="https://apachelogparser.com/assets/meta.png">
     <!-- Other Meta Tags -->
     <meta name="theme-color" content="#222222">
     <link rel="canonical" href="https://apachelogparser.com">
-    <link rel="icon" href="https://apachelogparser/assets/favicon.ico" />
+    <link rel="icon" href="assets/favicon.ico" />
     <link rel="stylesheet" href="styles.css">
 </head>
-<body style="display: flex; flex-direction: column; min-height: 100vh; margin: 0; overflow-y: auto;">
-    <header id="header-div" style="display: flex; align-items: center; justify-content: center; position: relative;">
-        <div id="hide-controls-toggle" style="display: none; position: absolute; left: 0; top: 50%; transform: translateY(-50%);">
-            <label style="display: flex; align-items: center; cursor: pointer;">
-                <input type="checkbox" id="toggle-slider" style="width: 0; height: 0; opacity: 0;">
-                <span style="width: 40px; height: 22px; background: #ccc; border-radius: 11px; position: relative; display: inline-block;">
-                    <span id="slider-knob" style="position: absolute; left: 2px; top: 2px; width: 18px; height: 18px; background: #fff; border-radius: 50%; transition: left 0.2s;"></span>
+
+<body>
+    <header id="header-div">
+        <div id="hide-controls-toggle" class="header-toggle is-hidden">
+            <label class="toggle-label">
+                <input type="checkbox" id="toggle-slider" class="toggle-input">
+                <span class="toggle-track">
+                    <span id="slider-knob" class="toggle-knob"></span>
                 </span>
-                <span id="slider-label" style="margin-left: 8px; color: #fff; font-size: 0.95em;">Compress File Selection</span>
+                <span id="slider-label" class="toggle-text">Compress File Selection</span>
             </label>
         </div>
-        <p style="margin: 0; width: 100%; text-align: center;">Apache Log Parser</p>
-        <img id="settings-cog" src="assets/settings.png" alt="Settings" style="position: absolute; right: 0; top: 50%; transform: translateY(-50%); width: 22px; height: 22px; cursor: pointer;" />
-        <div id="settings-dropdown" style="display:none; position:absolute; right:0; top:100%; min-width:260px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15); z-index:1000; padding: 12px 0;">
-            <div style="height:1px; background:#e0e0e0; margin:0 16px 12px 16px;"></div> <!-- #seperator -->
-            <div style="display:flex; flex-direction:column; gap:12px; padding:0 16px;">
-                <label id="hide-optional-label" style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+        <div class="title-block">
+            <p class="app-kicker">Local analysis</p>
+            <h1 class="app-title">Apache Log Parser</h1>
+            <p class="app-subtitle">Inspect access logs locally in your browser</p>
+        </div>
+        <img id="settings-cog" src="assets/ri--settings-4-line.svg" alt="Settings" class="settings-cog-icon" />
+        <div id="settings-dropdown" class="settings-dropdown is-hidden">
+            <div class="settings-panel-head">
+                <p class="settings-panel-title">Display settings</p>
+                <p class="settings-panel-copy">Tune the parser view without leaving the page.</p>
+            </div>
+            <div class="settings-separator settings-separator-spaced"></div> <!-- #seperator -->
+            <div class="settings-section">
+                <label id="hide-optional-label" class="settings-option">
                     <input id="hide-optional-checkbox" type="checkbox" />
                     <span>Hide Optional</span>
                 </label>
-                <label id="filter-error-label" style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                <label id="filter-error-label" class="settings-option">
                     <input id="filter-error-checkbox" type="checkbox" />
                     <span>Filter on Errors</span>
                 </label>
             </div>
-            <div style="display:flex; flex-direction:column; gap:12px; padding:12px 16px 0 16px;">
-                <label id="sort-date-label" style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+            <div class="settings-section settings-section-top">
+                <label id="sort-date-label" class="settings-option">
                     <input id="sort-date-checkbox" type="checkbox" />
                     <span>Sort by Date</span>
                 </label>
-                <div style="height:1px; background:#e0e0e0; margin:0 0 0 0;"></div> <!-- #seperator -->
-                <label id="ip-filter-label" style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size: 1em; font-weight:bold; margin-bottom:4px;">
+                <div class="settings-separator"></div> <!-- #seperator -->
+                <label for="ip-filter-input" id="ip-filter-label" class="settings-heading">
                     IP Filter
                 </label>
-                <input id="ip-filter-input" type="text" placeholder="Enter IP address..." 
-  style="width:100%; margin-bottom:4px; padding:6px; border-radius:4px; border:1px solid #ccc; font-size:0.8em;" 
-  title="Filter the parsed data by IP Address. Wildcards * and % can be used to represent any number of digits" />
+                <div class="settings-input-wrap">
+                    <input id="ip-filter-input" type="text" placeholder="Enter IP address..." class="settings-input"
+                        aria-describedby="ip-filter-tooltip" />
+                    <div id="ip-filter-tooltip" class="settings-tooltip" role="tooltip">
+                        Filter the parsed data by IP address. Wildcards `*` and `%` can be used to represent any number
+                        of digits.
+                    </div>
+                </div>
             </div>
-            <div style="height:1px; background:#e0e0e0; margin:12px 16px 0 16px;"></div> <!-- #seperator -->
+            <div class="settings-separator settings-separator-bottom"></div> <!-- #seperator -->
+            <div class="settings-section settings-section-bottom">
+                <label class="settings-theme-option" for="theme-toggle-checkbox">
+                    <div class="settings-option-copy-block">
+                        <span class="settings-option-title">Theme</span>
+                        <span id="theme-toggle-copy" class="settings-option-copy-small">Light mode active</span>
+                    </div>
+                    <input id="theme-toggle-checkbox" class="theme-toggle-input" type="checkbox" />
+                    <span class="theme-toggle-shell" aria-hidden="true">
+                        <span class="theme-toggle-knob"></span>
+                    </span>
+                </label>
+            </div>
         </div>
     </header>
-    <main id="main-element" style="flex-grow: 1;">
+    <main id="main-element">
         <div id="settings-div">
-            <div id="instructions" style="display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.3em;">
-                <h4 style="margin: 0;">Apache Log File.</h4>
-                <p style="margin: 0; font-size: 0.95em; color: #000000; margin-top: 2px;">
-                    Select or Drag & Drop your Apache log file here to parse and analyze the data. Files are processed locally in your browser and not uploaded to the server.
+            <div id="instructions" class="instructions-row">
+                <p class="instructions-label">Apache Log File</p>
+                <p class="instructions-copy">
+                    Select or Drag & Drop your Apache log file here to parse and analyze the data. Files are processed
+                    in-browser & not uploaded to our server.
                 </p>
             </div>
-            <div id="drop-area" style="border: 2px dashed #ccc; padding: 20px; text-align: center; margin-bottom: 10px;">
-                <p>Drag & drop log file here</p>
+            <div id="drop-area" class="drop-area">
+                <p class="drop-area-title">Drag and drop a log file</p>
+                <p class="drop-area-copy">or use the button to browse your machine</p>
             </div>
-            <div id="selectFile" style="display: flex; justify-content: center;">
-                <button id="file-btn">Select File</button>
-                <input type="file" id="hidden-file-input" style="display: none;" />
+            <div class="upload-actions">
+                <div id="selectFile" class="select-file-row">
+                    <button id="file-btn" class="action-btn primary-btn">Select File</button>
+                    <input type="file" id="hidden-file-input" class="is-hidden" />
+                </div>
+                <div id="file-info"></div>
             </div>
-            <div id="file-info"></div>
         </div>
         <div id="table-header-div">
-            <div style="display: flex; align-items: center; justify-content: center;">
-                <h4 id="parsed-header-title" style="margin: 0;">Parsed Log Data</h4>
-                <button id="copy-table-btn" style="display: none; margin-left: 16px; padding: 6px 14px; background: #487aed; color: #fff; border: none; border-radius: 5px; cursor: pointer;">Copy Table</button>
-                <button id="download-csv-btn" style="display: none; margin-left: 8px; padding: 6px 14px; background: #487aed; color: #fff; border: none; border-radius: 5px; cursor: pointer;">Download .CSV</button>
+            <div class="table-toolbar">
+                <div class="table-toolbar-copy">
+                    <p class="table-kicker">Parsed output</p>
+                    <h2 id="parsed-header-title" class="parsed-header-title">Parsed Log Data</h2>
+                </div>
+                <div class="table-actions">
+                    <button id="copy-table-btn" class="action-btn table-action-btn is-hidden">Copy Table</button>
+                    <button id="download-csv-btn" class="action-btn table-action-btn is-hidden">Download .CSV</button>
+                </div>
             </div>
             <div id="table-scroll-container">
                 <table id="log-table">
@@ -124,15 +162,15 @@
         </div>
     </main>
 
-    <footer id="footer-div" style="text-align: center;">
-        <p><a href="https://www.resonanceit.co.uk" style="text-decoration: none; color: inherit;">ResonanceIT.co.uk</a></p>
+    <footer id="footer-div">
+        <p><a href="https://www.resonanceit.co.uk" class="footer-link">ResonanceIT.co.uk</a>
+        </p>
     </footer>
-    <div id="cookie-banner" style="display:none; position:fixed; left:0; bottom:0; width:100%; background:#222; color:#fff; padding:12px 8px; text-align:center; z-index:9999; font-size:1em;">
-        Site uses cookies to operate properly.
-        <button id="cookie-ok-btn" style="margin-left:16px; padding:6px 18px; background:#487aed; color:#fff; border:none; border-radius:5px; font-weight:bold; cursor:pointer;">OK</button>
+    <div id="cookie-banner" class="cookie-banner is-hidden">
+        Site uses cookies to store your preferences only.
+        <button id="cookie-ok-btn" class="action-btn cookie-btn">OK</button>
     </div>
     <script src="script.js"></script>
 </body>
 
 </html>
-

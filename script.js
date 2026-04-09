@@ -1,17 +1,29 @@
-// Wait for DOM to load
 document.addEventListener('DOMContentLoaded', () => {
+  const HIDDEN_CLASS = 'is-hidden';
+  const COLUMN_HIDDEN_CLASS = 'is-column-hidden';
+  const ROW_HIDDEN_CLASS = 'is-row-hidden';
+  const SUCCESS_CLASS = 'is-success';
+  const ERROR_CLASS = 'has-error';
+  const IP_ADDRESS_PATTERN = '((?:\\d{1,3}\\.){3}\\d{1,3}|[a-fA-F0-9:]+)';
+  const ESCAPED_QUOTED_FIELD_PATTERN = '"((?:[^"\\\\]|\\\\.)*)"';
+  const APACHE_LOG_PATTERN = new RegExp(
+    `^${IP_ADDRESS_PATTERN} (\\S+) (\\S+) \\[([^\\]:]+):([^\\] ]+) ([^\\]]+)\\] "(\\S+) ([^"]+) (\\S+)" (\\d{3}) ([\\d-]+) ${ESCAPED_QUOTED_FIELD_PATTERN} ${ESCAPED_QUOTED_FIELD_PATTERN}(?: (\\d+))?(?: (.*))?$`
+  );
+  const APACHE_LOG_PATTERN_NO_TRAILING = new RegExp(
+    `^${IP_ADDRESS_PATTERN} (\\S+) (\\S+) \\[([^\\]:]+):([^\\] ]+) ([^\\]]+)\\] "(\\S+) ([^"]+) (\\S+)" (\\d{3}) ([\\d-]+) ${ESCAPED_QUOTED_FIELD_PATTERN} ${ESCAPED_QUOTED_FIELD_PATTERN}$`
+  );
+
   const fileBtn = document.getElementById('file-btn');
   const fileInput = document.getElementById('hidden-file-input');
   const fileInfo = document.getElementById('file-info');
   const logTableBody = document.getElementById('log-table-body');
   const dropArea = document.getElementById('drop-area');
-  const tableHeaderTitle = document.querySelector('#table-header-div h4');
+  const tableHeaderTitle = document.getElementById('parsed-header-title');
   const hideControlsToggle = document.getElementById('hide-controls-toggle');
   const toggleSlider = document.getElementById('toggle-slider');
-  const sliderKnob = document.getElementById('slider-knob');
   const instructionsDiv = document.getElementById('instructions');
   const dropAreaDiv = document.getElementById('drop-area');
-  const selectFileDiv = document.getElementById('select-file');
+  const selectFileDiv = document.getElementById('selectFile');
   const sliderLabel = document.getElementById('slider-label');
   const copyTableBtn = document.getElementById('copy-table-btn');
   const downloadCsvBtn = document.getElementById('download-csv-btn');
@@ -19,324 +31,352 @@ document.addEventListener('DOMContentLoaded', () => {
   const cookieOkBtn = document.getElementById('cookie-ok-btn');
   const logTableHeader = document.getElementById('log-table-header');
   const logTableHeaderRow = logTableHeader ? logTableHeader.querySelector('tr') : null;
-  const logTableHeaderFirstTh = logTableHeaderRow ? logTableHeaderRow.querySelector('th') : null;
+  const tableScrollContainer = document.getElementById('table-scroll-container');
   const sortDateCheckbox = document.getElementById('sort-date-checkbox');
   const ipFilterInput = document.getElementById('ip-filter-input');
+  const hideOptionalCheckbox = document.getElementById('hide-optional-checkbox');
+  const filterErrorCheckbox = document.getElementById('filter-error-checkbox');
+  const settingsCog = document.getElementById('settings-cog');
+  const settingsDropdown = document.getElementById('settings-dropdown');
+  const themeToggleCheckbox = document.getElementById('theme-toggle-checkbox');
+  const themeToggleCopy = document.getElementById('theme-toggle-copy');
+  const themeColorMeta = document.querySelector('meta[name="theme-color"]');
 
-  // Set initial header text
-  if (tableHeaderTitle) {
-    tableHeaderTitle.textContent = "Parsed data will be displayed below";
-    tableHeaderTitle.style.color = "";
+  let lastParsedLogText = '';
+  let lastParsedFilename = '';
+
+  function applyTheme(theme, persist = false) {
+    const nextTheme = theme === 'dark' ? 'dark' : 'light';
+    document.body.dataset.theme = nextTheme;
+
+    if (themeToggleCheckbox) {
+      themeToggleCheckbox.checked = nextTheme === 'dark';
+      themeToggleCheckbox.setAttribute('aria-checked', String(nextTheme === 'dark'));
+    }
+
+    if (themeToggleCopy) {
+      themeToggleCopy.textContent = nextTheme === 'dark' ? 'Dark mode active' : 'Light mode active';
+    }
+
+    if (themeColorMeta) {
+      themeColorMeta.setAttribute('content', nextTheme === 'dark' ? '#14111d' : '#f2eef8');
+    }
+
+    if (persist) {
+      setCookie('themePreference', nextTheme);
+    }
   }
 
-  // Prevent default drag/drop behavior for the whole document
-  document.addEventListener('dragover', (e) => {
-    /* console.log('Document dragover'); */
-    e.preventDefault();
-  });
-  document.addEventListener('drop', (e) => {
-    /* console.log('Document drop'); */
-    e.preventDefault();
-  });
-
-  // Prevent default click behavior on drop area
-  dropArea.addEventListener('click', (e) => {
-    console.log('Drop area clicked');
-    e.preventDefault();
-  });
-
-  // Highlight drop area on dragover
-  dropArea.addEventListener('dragover', (e) => {
-    /* console.log('Drop area dragover'); */
-    e.preventDefault();
-    dropArea.classList.add('drag-over');
-  });
-  dropArea.addEventListener('dragenter', (e) => {
-    /* console.log('Drop area dragenter'); */
-    e.preventDefault();
-    dropArea.classList.add('drag-over');
-  });
-  dropArea.addEventListener('dragleave', (e) => {
-    /* console.log('Drop area dragleave'); */
-    dropArea.classList.remove('drag-over');
-  });
-
-  // Handle file drop
-  dropArea.addEventListener('drop', (e) => {
-    /* console.log('Drop area drop'); */
-    e.preventDefault();
-    dropArea.classList.remove('drag-over');
-    const files = e.dataTransfer.files;
-    console.log('Files dropped:', files);
-    if (files && files.length > 0) {
-      const file = files[0];
-      console.log('Processing dropped file:', file.name);
-      fileInfo.innerHTML = `Parsed file: ${file.name}`;
-      const reader = new FileReader();
-      reader.onload = function(ev) {
-        /* console.log('FileReader loaded dropped file'); */
-        const text = ev.target.result;
-        const lines = text.split('\n').filter(line => line.trim() !== '');
-        const regex = /^(\S+) (\S+) (\S+) \[([^\]:]+):([^\] ]+) ([^\]]+)\] "(\S+) ([^"]+) (\S+)" (\d+) (\d+) "([^"]*)" "([^"]*)" (\d+)? (.*)?$/;
-        const anyMatch = lines.some(line => regex.test(line));
-        if (tableHeaderTitle) {
-          if (anyMatch) {
-            tableHeaderTitle.textContent = "Parsed Log Data";
-            tableHeaderTitle.style.color = "";
-          } else {
-            tableHeaderTitle.textContent = "***The selected file is not in the expected format!*** See browser Console for details. (press F12)";
-            tableHeaderTitle.style.color = "white";
-          }
-        }
-        parseAndDisplayLogs(text);
-      };
-      reader.onerror = function(ev) {
-        console.error('FileReader error:', ev);
-      };
-      reader.readAsText(file);
-    } else {
-      console.log('No files found in drop event');
-    }
-  });
-
-  // Trigger file input when button is clicked
-  fileBtn.addEventListener('mousedown', (e) => {
-    e.preventDefault();
-    fileInput.click();
-  });
-
-  // Handle file selection
-  fileInput.addEventListener('change', () => {
-    /* console.log('File input changed'); */
-    const file = fileInput.files[0];
-    if (file) {
-      console.log('Processing selected file:', file.name);
-      fileInfo.textContent = `Parsed file: ${file.name}`;
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        /* console.log('FileReader loaded selected file'); */
-        const text = e.target.result;
-        const lines = text.split('\n').filter(line => line.trim() !== '');
-        const regex = /^(\S+) (\S+) (\S+) \[([^\]:]+):([^\] ]+) ([^\]]+)\] "(\S+) ([^"]+) (\S+)" (\d+) (\d+) "([^"]*)" "([^"]*)" (\d+)? (.*)?$/;
-        const anyMatch = lines.some(line => regex.test(line));
-        if (tableHeaderTitle) {
-          if (anyMatch) {
-            tableHeaderTitle.textContent = "Parsed Log Data";
-            tableHeaderTitle.style.color = "";
-          } else {
-            tableHeaderTitle.textContent = "***The selected file is not in the expected format!***";
-            tableHeaderTitle.style.color = "white";
-          }
-        }
-        parseAndDisplayLogs(text);
-      };
-      reader.onerror = function(ev) {
-        console.error('FileReader error:', ev);
-      };
-      reader.readAsText(file);
-    } else {
-      console.log('No file selected');
-    }
-  });
-
-  // Helper to show/hide controls
-  function setControlsVisibility(hidden) {
-    if (instructionsDiv) instructionsDiv.style.display = hidden ? 'none' : '';
-    if (dropAreaDiv) dropAreaDiv.style.display = hidden ? 'none' : '';
-    if (selectFileDiv) selectFiledDiv.style.display = hidden ? 'none' : '';
-    if (sliderLabel) sliderLabel.textContent = hidden ? 'Expand File Selection' : 'Compress File Selection';
+  function unescapeQuotedField(value) {
+    return value.replace(/\\"/g, '"').replace(/\\\\/g, '\\');
   }
 
-  // Reset controls and slider on page load
-  setControlsVisibility(false);
-  if (hideControlsToggle) hideControlsToggle.style.display = 'none';
-  if (toggleSlider) toggleSlider.checked = false;
-  if (sliderKnob) sliderKnob.style.left = '2px';
+  function matchApacheLogLine(line) {
+    let match = line.match(APACHE_LOG_PATTERN);
 
-  // Slider toggle logic
-  if (toggleSlider) {
-    toggleSlider.addEventListener('change', function () {
-      setControlsVisibility(this.checked);
-      if (sliderKnob) {
-        sliderKnob.style.left = this.checked ? '20px' : '2px';
+    if (!match) {
+      match = line.match(APACHE_LOG_PATTERN_NO_TRAILING);
+      if (match) {
+        match[14] = '';
+        match[15] = '';
+      }
+    }
+
+    return match;
+  }
+
+  function setHidden(element, hidden) {
+    if (element) {
+      element.classList.toggle(HIDDEN_CLASS, hidden);
+    }
+  }
+
+  function setHeaderState(text, isError = false) {
+    if (!tableHeaderTitle) {
+      return;
+    }
+
+    tableHeaderTitle.textContent = text;
+    tableHeaderTitle.classList.toggle(ERROR_CLASS, isError);
+  }
+
+  function flashCopySuccess() {
+    if (!copyTableBtn) {
+      return;
+    }
+
+    copyTableBtn.textContent = 'Copied!';
+    copyTableBtn.classList.add(SUCCESS_CLASS);
+
+    setTimeout(() => {
+      copyTableBtn.textContent = 'Copy Table';
+      copyTableBtn.classList.remove(SUCCESS_CLASS);
+    }, 1200);
+  }
+
+  setHeaderState('Parsed data will be displayed below');
+
+  document.addEventListener('dragover', (event) => {
+    event.preventDefault();
+  });
+
+  document.addEventListener('drop', (event) => {
+    event.preventDefault();
+  });
+
+  if (dropArea) {
+    dropArea.addEventListener('click', (event) => {
+      event.preventDefault();
+    });
+
+    dropArea.addEventListener('dragover', (event) => {
+      event.preventDefault();
+      dropArea.classList.add('drag-over');
+    });
+
+    dropArea.addEventListener('dragenter', (event) => {
+      event.preventDefault();
+      dropArea.classList.add('drag-over');
+    });
+
+    dropArea.addEventListener('dragleave', () => {
+      dropArea.classList.remove('drag-over');
+    });
+
+    dropArea.addEventListener('drop', (event) => {
+      event.preventDefault();
+      dropArea.classList.remove('drag-over');
+
+      const files = event.dataTransfer ? event.dataTransfer.files : null;
+      if (files && files.length > 0) {
+        readLogFile(files[0], '***The selected file is not in the expected format!*** See browser Console for details. (press F12)');
       }
     });
   }
 
-  // Show slider after file is parsed
+  if (fileBtn && fileInput) {
+    fileBtn.addEventListener('mousedown', (event) => {
+      event.preventDefault();
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files ? fileInput.files[0] : null;
+      if (file) {
+        readLogFile(file, '***The selected file is not in the expected format!***');
+      }
+    });
+  }
+
+  function readLogFile(file, invalidMessage) {
+    if (!file || !fileInfo) {
+      return;
+    }
+
+    lastParsedFilename = file.name;
+    fileInfo.textContent = `Parsed file: ${file.name}`;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target ? event.target.result : '';
+      const lines = String(text).split('\n').filter(line => line.trim() !== '');
+      const anyMatch = lines.some(line => Boolean(matchApacheLogLine(line)));
+
+      if (anyMatch) {
+        setHeaderState('Parsed Log Data');
+      } else {
+        setHeaderState(invalidMessage, true);
+      }
+
+      parseAndDisplayLogs(String(text));
+    };
+
+    reader.onerror = (event) => {
+      console.error('FileReader error:', event);
+    };
+
+    reader.readAsText(file);
+  }
+
+  function setControlsVisibility(hidden) {
+    setHidden(instructionsDiv, hidden);
+    setHidden(dropAreaDiv, hidden);
+    setHidden(selectFileDiv, hidden);
+
+    if (sliderLabel) {
+      sliderLabel.textContent = hidden ? 'Expand File Selection' : 'Compress File Selection';
+    }
+  }
+
+  setControlsVisibility(false);
+  setHidden(hideControlsToggle, true);
+  if (toggleSlider) {
+    toggleSlider.checked = false;
+    toggleSlider.addEventListener('change', function () {
+      setControlsVisibility(this.checked);
+    });
+  }
+
   function showSlider() {
-    if (hideControlsToggle) hideControlsToggle.style.display = '';
+    setHidden(hideControlsToggle, false);
   }
 
-  // Show Copy Table and Download CSV buttons when header is "Parsed Log Data"
   function showCopyTableBtn(show) {
-    if (copyTableBtn) copyTableBtn.style.display = show ? '' : 'none';
-    if (downloadCsvBtn) downloadCsvBtn.style.display = show ? '' : 'none';
+    setHidden(copyTableBtn, !show);
+    setHidden(downloadCsvBtn, !show);
   }
 
-  // Helper to get CSV string for visible columns
+  function getVisibleColumnIndices() {
+    const optional = [1, 2, 11, 13, 14];
+    if (hideOptionalCheckbox && hideOptionalCheckbox.checked) {
+      return Array.from({ length: 15 }, (_, index) => index).filter(index => !optional.includes(index));
+    }
+
+    return Array.from({ length: 15 }, (_, index) => index);
+  }
+
   function getVisibleTableCsv() {
     const table = document.getElementById('log-table');
+    if (!table) {
+      return '';
+    }
+
     const visibleIndices = getVisibleColumnIndices();
-    // Get header row
     const headers = Array.from(table.querySelectorAll('thead th'))
-      .filter((th, idx) => visibleIndices.includes(idx))
+      .filter((th, index) => visibleIndices.includes(index))
       .map(th => `"${th.textContent.trim()}"`);
-    let csv = headers.join(',') + '\n';
-    // Get body rows
+
+    let csv = `${headers.join(',')}\n`;
     const rows = table.querySelectorAll('tbody tr');
-    rows.forEach(tr => {
-      const cells = Array.from(tr.querySelectorAll('td'))
-        .filter((td, idx) => visibleIndices.includes(idx))
+
+    rows.forEach((tableRow) => {
+      if (tableRow.classList.contains(ROW_HIDDEN_CLASS)) {
+        return;
+      }
+
+      const cells = Array.from(tableRow.querySelectorAll('td'))
+        .filter((td, index) => visibleIndices.includes(index))
         .map(td => `"${td.textContent.trim()}"`);
-      csv += cells.join(',') + '\n';
+
+      csv += `${cells.join(',')}\n`;
     });
+
     return csv;
   }
 
-  // Copy table to clipboard as CSV
   if (copyTableBtn) {
-    copyTableBtn.addEventListener('click', function () {
+    copyTableBtn.addEventListener('click', () => {
       const csv = getVisibleTableCsv();
-      // Copy to clipboard (check for API support)
       if (navigator && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
         navigator.clipboard.writeText(csv).then(() => {
-          copyTableBtn.textContent = "Copied!";
-          copyTableBtn.style.background = "#2ecc40"; // green
-          setTimeout(() => {
-            copyTableBtn.textContent = "Copy Table";
-            copyTableBtn.style.background = "#487aed"; // original
-          }, 1200);
+          flashCopySuccess();
         }).catch(() => {
-          alert("Copy to clipboard failed. Please copy manually.");
+          alert('Copy to clipboard failed. Please copy manually.');
         });
-      } else {
-        const textarea = document.createElement('textarea');
-        textarea.value = csv;
-        document.body.appendChild(textarea);
-        textarea.select();
-        try {
-          document.execCommand('copy');
-          copyTableBtn.textContent = "Copied!";
-          copyTableBtn.style.background = "#2ecc40"; // green
-          setTimeout(() => {
-            copyTableBtn.textContent = "Copy Table";
-            copyTableBtn.style.background = "#487aed"; // original
-          }, 1200);
-        } catch (err) {
-          alert("Copy to clipboard failed. Please copy manually.");
-        }
-        document.body.removeChild(textarea);
+        return;
       }
+
+      const textarea = document.createElement('textarea');
+      textarea.value = csv;
+      document.body.appendChild(textarea);
+      textarea.select();
+
+      try {
+        document.execCommand('copy');
+        flashCopySuccess();
+      } catch (error) {
+        alert('Copy to clipboard failed. Please copy manually.');
+      }
+
+      document.body.removeChild(textarea);
     });
   }
 
-  // Download CSV button logic
   if (downloadCsvBtn) {
-    downloadCsvBtn.addEventListener('click', function () {
+    downloadCsvBtn.addEventListener('click', () => {
       const csv = getVisibleTableCsv();
-      // Get filename from fileInfo
-      let baseFilename = "apachelog";
-      if (fileInfo && fileInfo.textContent) {
-        const match = fileInfo.textContent.match(/Parsed file: ([^\.]+(\.[^\s]+)?)/);
-        if (match && match[1]) {
-          baseFilename = match[1].replace(/\.[^/.]+$/, ''); // remove extension
-        }
+      let baseFilename = 'apachelog';
+
+      if (lastParsedFilename) {
+        baseFilename = lastParsedFilename.replace(/\.[^/.]+$/, '');
       }
-      // Get current datetime in YYYYMMDD-HHMMSS
+
       const now = new Date();
-      const pad = n => n.toString().padStart(2, '0');
-      const datetime = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+      const pad = (value) => value.toString().padStart(2, '0');
+      const datetime = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
       const filename = `${baseFilename}-${datetime}.CSV`;
 
-      // Create and trigger download
       const blob = new Blob([csv], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+
       setTimeout(() => {
-        document.body.removeChild(a);
+        document.body.removeChild(link);
         URL.revokeObjectURL(url);
       }, 100);
     });
   }
 
-  // Hide Optional columns logic
-  const hideOptionalCheckbox = document.getElementById('hide-optional-checkbox');
   function setOptionalColumnsVisibility(hidden) {
-    // Column indices: Identity(1), User ID(2), Referrer(11), Processing Time(13), Custom Metrics(14)
     const indices = [1, 2, 11, 13, 14];
-    const userAgentIdx = 12;
     const table = document.getElementById('log-table');
-    if (!table) return;
-    // Hide/show header cells
-    indices.forEach(idx => {
-      // Do not hide User Agent column
-      if (idx === userAgentIdx) return;
-      const th = table.querySelector(`thead th:nth-child(${idx + 1})`);
-      if (th) th.style.display = hidden ? 'none' : '';
+    if (!table) {
+      return;
+    }
+
+    indices.forEach((index) => {
+      const headerCell = table.querySelector(`thead th:nth-child(${index + 1})`);
+      if (headerCell) {
+        headerCell.classList.toggle(COLUMN_HIDDEN_CLASS, hidden);
+      }
     });
-    // Hide/show body cells
-    table.querySelectorAll('tbody tr').forEach(tr => {
-      indices.forEach(idx => {
-        // Do not hide User Agent column
-        if (idx === userAgentIdx) return;
-        const td = tr.querySelector(`td:nth-child(${idx + 1})`);
-        if (td) td.style.display = hidden ? 'none' : '';
+
+    table.querySelectorAll('tbody tr').forEach((tableRow) => {
+      indices.forEach((index) => {
+        const bodyCell = tableRow.querySelector(`td:nth-child(${index + 1})`);
+        if (bodyCell) {
+          bodyCell.classList.toggle(COLUMN_HIDDEN_CLASS, hidden);
+        }
       });
     });
   }
-  if (hideOptionalCheckbox) {
-    hideOptionalCheckbox.addEventListener('change', function () {
-      setOptionalColumnsVisibility(this.checked);
-    });
-  }
-  // Ensure columns are shown on page load
-  setOptionalColumnsVisibility(false);
-
-  // Helper: get visible column indices
-  function getVisibleColumnIndices() {
-    // All columns: 0-14
-    // Optional columns: 1,2,11,13,14
-    const optional = [1,2,11,13,14];
-    if (hideOptionalCheckbox && hideOptionalCheckbox.checked) {
-      return Array.from({length: 15}, (_, i) => i).filter(i => !optional.includes(i));
-    } else {
-      return Array.from({length: 15}, (_, i) => i);
-    }
-  }
-
-  const filterErrorCheckbox = document.getElementById('filter-error-checkbox');
 
   function setErrorRowsVisibility(enabled) {
     const table = document.getElementById('log-table');
-    if (!table) return;
-    // Status Code is column index 9 (10th column)
-    table.querySelectorAll('tbody tr').forEach(tr => {
-      // Always show all rows if filter is disabled
+    if (!table) {
+      return;
+    }
+
+    table.querySelectorAll('tbody tr').forEach((tableRow) => {
       if (!enabled) {
-        tr.style.display = '';
+        tableRow.classList.remove(ROW_HIDDEN_CLASS);
         return;
       }
-      const statusTd = tr.querySelector('td:nth-child(10)');
-      if (!statusTd) return;
-      const status = statusTd.textContent.trim();
-      tr.style.display = (status.startsWith('4') || status.startsWith('5')) ? '' : 'none';
+
+      const statusCell = tableRow.querySelector('td:nth-child(10)');
+      if (!statusCell) {
+        return;
+      }
+
+      const status = statusCell.textContent.trim();
+      tableRow.classList.toggle(ROW_HIDDEN_CLASS, !(status.startsWith('4') || status.startsWith('5')));
     });
   }
 
-  let lastParsedLogText = ""; // Store last parsed log text
+  setOptionalColumnsVisibility(false);
 
-  // Update file parsing to store the log text
   function parseAndDisplayLogs(logText) {
-    lastParsedLogText = logText; // Save for future re-parsing
-    logTableBody.innerHTML = ''; // Clear previous rows
-    const lines = logText.split('\n').filter(line => line.trim() !== '');
+    lastParsedLogText = logText;
+    if (!logTableBody) {
+      return;
+    }
 
-    // Collect parsed rows as objects for sorting
+    logTableBody.innerHTML = '';
+    const lines = logText.split('\n').filter(line => line.trim() !== '');
     let parsedRows = [];
 
     console.log(
@@ -347,136 +387,115 @@ document.addEventListener('DOMContentLoaded', () => {
     let matchedCount = 0;
     let notMatchedCount = 0;
 
-    lines.forEach((line, idx) => {
-      // Reasoning:
-      // Previous regexes failed because they required three quoted fields after the request.
-      // The example line only has two quoted fields ("Referrer" and "User Agent").
-      // Solution: Use a regex that matches two quoted fields after the request, and optionally matches a space and two trailing fields.
-      // This covers all standard Apache log lines, including those with only two quoted fields after the request.
+    lines.forEach((line, index) => {
+      const match = matchApacheLogLine(line);
 
-      const regex = /^((?:\d{1,3}\.){3}\d{1,3}|[a-fA-F0-9:]+) (\S+) (\S+) \[([^\]:]+):([^\] ]+) ([^\]]+)\] "(\S+) ([^"]+) (\S+)" (\d{3}) ([\d-]+) "([^"]*)" "([^"]*)"(?: (\d+))?(?: (.*))?$/;
-
-      let match = line.match(regex);
-
-      // If not matched, try a version that ends after User Agent (no trailing fields)
       if (!match) {
-        match = line.match(/^((?:\d{1,3}\.){3}\d{1,3}|[a-fA-F0-9:]+) (\S+) (\S+) \[([^\]:]+):([^\] ]+) ([^\]]+)\] "(\S+) ([^"]+) (\S+)" (\d{3}) ([\d-]+) "([^"]*)" "([^"]*)"$/);
-        if (match) {
-          match[14] = ""; // processingTime
-          match[15] = ""; // customMetrics
-        }
-      }
-
-      if (match) {
-        matchedCount++;
-
-        const [
-          _, ip, identity, userid, date, time, utcOffset,
-          method, fileRequested, protocol, status, size,
-          referrer, userAgent, processingTime, customMetrics
-        ] = match;
-
-        const procTime = typeof processingTime === "undefined" ? "" : processingTime;
-        const custMetrics = typeof customMetrics === "undefined" ? "" : customMetrics;
-
-        const normalize = val => val === '-' ? '' : val;
-
-        let formattedDate = date;
-        const dateRegex = /^(\d{2})\/([A-Za-z]{3})\/(\d{4})$/;
-        const dateMatch = date.match(dateRegex);
-        if (dateMatch) {
-          formattedDate = `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`;
-        }
-
-        // For sorting, create a JS Date object from date and time
-        // Example: 17-May-2015 10:05:03 +0000
-        let sortableDate = null;
-        if (dateMatch) {
-          // Convert month abbreviation to number
-          const monthMap = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
-          const day = parseInt(dateMatch[1], 10);
-          const month = monthMap[dateMatch[2]];
-          const year = parseInt(dateMatch[3], 10);
-          const [hh, mm, ss] = time.split(':').map(Number);
-          sortableDate = new Date(Date.UTC(year, month, day, hh, mm, ss));
-        }
-
-        const allColumns = [
-          normalize(ip),              // 0 IP Address
-          normalize(identity),        // 1 Identity
-          normalize(userid),          // 2 User ID
-          formattedDate,              // 3 Date
-          time,                       // 4 Time
-          utcOffset,                  // 5 UTC Offset
-          normalize(method),          // 6 HTTP Method
-          normalize(fileRequested),   // 7 Requested File
-          normalize(protocol),        // 8 Protocol
-          status,                     // 9 Status Code
-          size,                       // 10 Response Size
-          normalize(referrer),        // 11 Referrer
-          normalize(userAgent),       // 12 User Agent
-          procTime,                   // 13 Processing Time
-          custMetrics                 // 14 Custom Metrics
-        ];
-
-        // Filter on Errors: only add if status starts with 4 or 5
-        const filterErrors = filterErrorCheckbox && filterErrorCheckbox.checked;
-        if (filterErrors && !(status.startsWith('4') || status.startsWith('5'))) {
-          return; // skip non-error rows
-        }
-
-        parsedRows.push({
-          columns: allColumns,
-          sortableDate: sortableDate || new Date(0), // fallback to epoch if not parsed
-        });
-      } else {
         notMatchedCount++;
-        // Check for possible idle browser session pattern
         const idlePattern = /^(\S+) (\S+) (\S+) \[([^\]:]+):([^\] ]+) ([^\]]+)\] "-" 408 0 "-" "-"/;
         if (idlePattern.test(line)) {
-          console.log(`Line ${idx + 1} did not match regex: . Possible idle browser session.`, line);
+          console.log(`Line ${index + 1} did not match regex: . Possible idle browser session.`, line);
         } else {
-          console.log(`Line ${idx + 1} did not match regex:`, line);
+          console.log(`Line ${index + 1} did not match regex:`, line);
         }
+        return;
       }
+
+      matchedCount++;
+
+      const [
+        , ip, identity, userid, date, time, utcOffset,
+        method, fileRequested, protocol, status, size,
+        referrer, userAgent, processingTime, customMetrics,
+      ] = match;
+
+      const normalize = (value) => value === '-' ? '' : value;
+      const procTime = typeof processingTime === 'undefined' ? '' : processingTime;
+      const custMetrics = typeof customMetrics === 'undefined' ? '' : customMetrics;
+
+      let formattedDate = date;
+      const dateRegex = /^(\d{2})\/([A-Za-z]{3})\/(\d{4})$/;
+      const dateMatch = date.match(dateRegex);
+      if (dateMatch) {
+        formattedDate = `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`;
+      }
+
+      let sortableDate = null;
+      if (dateMatch) {
+        const monthMap = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 };
+        const day = parseInt(dateMatch[1], 10);
+        const month = monthMap[dateMatch[2]];
+        const year = parseInt(dateMatch[3], 10);
+        const [hours, minutes, seconds] = time.split(':').map(Number);
+        sortableDate = new Date(Date.UTC(year, month, day, hours, minutes, seconds));
+      }
+
+      const allColumns = [
+        normalize(ip),
+        normalize(identity),
+        normalize(userid),
+        formattedDate,
+        time,
+        utcOffset,
+        normalize(method),
+        normalize(fileRequested),
+        normalize(protocol),
+        status,
+        size,
+        normalize(unescapeQuotedField(referrer)),
+        normalize(unescapeQuotedField(userAgent)),
+        procTime,
+        custMetrics,
+      ];
+
+      const filterErrors = filterErrorCheckbox && filterErrorCheckbox.checked;
+      if (filterErrors && !(status.startsWith('4') || status.startsWith('5'))) {
+        return;
+      }
+
+      parsedRows.push({
+        columns: allColumns,
+        sortableDate: sortableDate || new Date(0),
+      });
     });
 
-    // IP Filter logic
-    let ipFilterValue = ipFilterInput ? ipFilterInput.value.trim() : "";
+    const ipFilterValue = ipFilterInput ? ipFilterInput.value.trim() : '';
     if (ipFilterValue.length > 0) {
-      // Replace * and % with .*
       let pattern = ipFilterValue.replace(/(\*|%)/g, '.*');
-      // Escape other regex special chars except . and *
       pattern = pattern.replace(/([+?^=!:${}()|\[\]\/\\])/g, '\\$1');
-      // Always match from start
-      const ipRegex = new RegExp('^' + pattern);
-      parsedRows = parsedRows.filter(rowObj => ipRegex.test(rowObj.columns[0]));
+      const ipRegex = new RegExp(`^${pattern}`);
+      parsedRows = parsedRows.filter(rowObject => ipRegex.test(rowObject.columns[0]));
     }
 
-    // Sort rows by date if option is checked
     if (sortDateCheckbox && sortDateCheckbox.checked) {
-      parsedRows.sort((a, b) => b.sortableDate - a.sortableDate); // Descending: newest first
+      parsedRows.sort((left, right) => right.sortableDate - left.sortableDate);
     } else {
-      parsedRows.sort((a, b) => a.sortableDate - b.sortableDate); // Ascending: oldest first
+      parsedRows.sort((left, right) => left.sortableDate - right.sortableDate);
     }
 
-    // Render sorted rows
-    parsedRows.forEach(rowObj => {
-      const allColumns = rowObj.columns;
-      const optional = [1,2,11,13,14];
+    parsedRows.forEach((rowObject) => {
+      const optionalColumns = [1, 2, 11, 13, 14];
       const hideOptional = hideOptionalCheckbox && hideOptionalCheckbox.checked;
       const row = document.createElement('tr');
-      allColumns.forEach((val, i) => {
-        const td = document.createElement('td');
-        td.textContent = val;
-        if (i === 12) td.classList.add('user-agent-col');
-        if (hideOptional && optional.includes(i)) td.style.display = 'none';
-        row.appendChild(td);
+
+      rowObject.columns.forEach((value, columnIndex) => {
+        const cell = document.createElement('td');
+        cell.textContent = value;
+
+        if (columnIndex === 12) {
+          cell.classList.add('user-agent-col');
+        }
+
+        if (hideOptional && optionalColumns.includes(columnIndex)) {
+          cell.classList.add(COLUMN_HIDDEN_CLASS);
+        }
+
+        row.appendChild(cell);
       });
+
       logTableBody.appendChild(row);
     });
 
-    // Print summary with colored numbers
     console.log(
       `Summary: %c${matchedCount}%c lines matched, %c${notMatchedCount}%c lines did not match.`,
       'color: #0074D9; font-weight: bold;',
@@ -487,104 +506,138 @@ document.addEventListener('DOMContentLoaded', () => {
 
     showSlider();
 
-    // Always set header and Copy Table button visibility based on matchedCount
-    if (tableHeaderTitle) {
-      if (matchedCount === 0) {
-        tableHeaderTitle.textContent = "0 lines matched the format!";
-        showCopyTableBtn(false);
-      } else {
-        tableHeaderTitle.textContent = "Parsed Log Data";
-        showCopyTableBtn(true);
-      }
+    if (matchedCount === 0) {
+      setHeaderState('0 lines matched the format!');
+      showCopyTableBtn(false);
+    } else {
+      setHeaderState('Parsed Log Data');
+      showCopyTableBtn(true);
     }
 
-    // Always update fileInfo for 0 matched lines
     if (fileInfo) {
       if (matchedCount === 0) {
-        fileInfo.innerHTML = "<span style='color:#487aed;font-weight:bold;'>No lines in the file matched the expected format. Please check your file and see the console log for details.</span>";
-      } else if (fileInfo.innerHTML.startsWith("Parsed file:")) {
+        fileInfo.textContent = 'No lines in the file matched the expected format. Please check your file and see the console log for details.';
+      } else if (lastParsedFilename) {
+        let message = `Parsed file: ${lastParsedFilename}`;
         if (notMatchedCount > 0) {
-          fileInfo.innerHTML += `. ${notMatchedCount} lines in the file not added to table. See console log.`;
+          message += `. ${notMatchedCount} lines in the file not added to table. See console log.`;
         }
+        fileInfo.textContent = message;
       }
     }
 
-    // After parsing, ensure column visibility matches checkbox
-    setOptionalColumnsVisibility(hideOptionalCheckbox && hideOptionalCheckbox.checked);
-    setErrorRowsVisibility(filterErrorCheckbox && filterErrorCheckbox.checked);
+    setOptionalColumnsVisibility(Boolean(hideOptionalCheckbox && hideOptionalCheckbox.checked));
+    setErrorRowsVisibility(Boolean(filterErrorCheckbox && filterErrorCheckbox.checked));
   }
 
   function setCookie(name, value, days = 365) {
-    const expires = new Date(Date.now() + days*24*60*60*1000).toUTCString();
+    const expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toUTCString();
     document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/`;
   }
+
   function getCookie(name) {
-    const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+    const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
     return match ? decodeURIComponent(match[2]) : null;
   }
 
+  function getCookieBoolean(name, defaultValue = false) {
+    const value = getCookie(name);
+    if (value === null) {
+      return defaultValue;
+    }
+
+    return value === 'true';
+  }
+
+  if (hideOptionalCheckbox) {
+    hideOptionalCheckbox.checked = getCookieBoolean('hideOptionalPreference');
+  }
+
+  if (filterErrorCheckbox) {
+    filterErrorCheckbox.checked = getCookieBoolean('filterErrorPreference');
+  }
+
+  if (sortDateCheckbox) {
+    sortDateCheckbox.checked = getCookieBoolean('sortDatePreference');
+  }
+
+  applyTheme(getCookie('themePreference') || 'light');
+  setOptionalColumnsVisibility(Boolean(hideOptionalCheckbox && hideOptionalCheckbox.checked));
+  setErrorRowsVisibility(Boolean(filterErrorCheckbox && filterErrorCheckbox.checked));
+
   function showCookieBannerIfNeeded() {
     if (!getCookie('cookieAccepted')) {
-      cookieBanner.style.display = '';
+      setHidden(cookieBanner, false);
     }
   }
+
   if (cookieOkBtn) {
-    cookieOkBtn.onclick = function() {
+    cookieOkBtn.addEventListener('click', () => {
       setCookie('cookieAccepted', 'true');
-      cookieBanner.style.display = 'none';
-    };
+      setHidden(cookieBanner, true);
+    });
   }
+
+  if (themeToggleCheckbox) {
+    themeToggleCheckbox.addEventListener('change', function () {
+      applyTheme(this.checked ? 'dark' : 'light', true);
+    });
+  }
+
   showCookieBannerIfNeeded();
 
-  // Settings dropdown toggle logic
-  const settingsCog = document.getElementById('settings-cog');
-  const settingsDropdown = document.getElementById('settings-dropdown');
   if (settingsCog && settingsDropdown) {
-    settingsCog.addEventListener('click', (e) => {
-      e.stopPropagation();
-      settingsDropdown.style.display = (settingsDropdown.style.display === 'none' || settingsDropdown.style.display === '') ? 'block' : 'none';
+    settingsCog.addEventListener('click', (event) => {
+      event.stopPropagation();
+      settingsDropdown.classList.toggle(HIDDEN_CLASS);
     });
-    document.addEventListener('click', (e) => {
-      if (!settingsDropdown.contains(e.target) && e.target !== settingsCog) {
-        settingsDropdown.style.display = 'none';
+
+    document.addEventListener('click', (event) => {
+      if (!settingsDropdown.contains(event.target) && event.target !== settingsCog) {
+        settingsDropdown.classList.add(HIDDEN_CLASS);
       }
+    });
+  }
+
+  if (hideOptionalCheckbox) {
+    hideOptionalCheckbox.addEventListener('change', function () {
+      setCookie('hideOptionalPreference', String(this.checked));
+      setOptionalColumnsVisibility(this.checked);
     });
   }
 
   if (filterErrorCheckbox) {
-    filterErrorCheckbox.addEventListener('change', function () {
-      // Instead of just toggling row visibility, re-parse and re-render the table
+    filterErrorCheckbox.addEventListener('change', () => {
+      setCookie('filterErrorPreference', String(filterErrorCheckbox.checked));
       parseAndDisplayLogs(lastParsedLogText);
     });
   }
 
-  // Sticky header border logic
   function updateTableHeaderBorder() {
-    if (!logTableHeaderRow) return;
-    const rect = logTableHeader.getBoundingClientRect();
-    if (rect.top > 0) {
-      // Header is NOT at the top, show white border across all th
-      logTableHeaderRow.classList.add('thead-top-border');
-    } else {
-      // Header is at the top, remove border
-      logTableHeaderRow.classList.remove('thead-top-border');
+    if (!logTableHeader || !logTableHeaderRow) {
+      return;
     }
+
+    const rect = logTableHeader.getBoundingClientRect();
+    logTableHeaderRow.classList.toggle('thead-top-border', rect.top > 0);
   }
-  // Initial state
+
   updateTableHeaderBorder();
   window.addEventListener('scroll', updateTableHeaderBorder, { passive: true });
   window.addEventListener('resize', updateTableHeaderBorder, { passive: true });
+  if (tableScrollContainer) {
+    tableScrollContainer.addEventListener('scroll', updateTableHeaderBorder, { passive: true });
+  }
 
   if (sortDateCheckbox) {
-    sortDateCheckbox.addEventListener('change', function () {
-      // Re-parse and re-render table with new sort order
+    sortDateCheckbox.addEventListener('change', () => {
+      setCookie('sortDatePreference', String(sortDateCheckbox.checked));
       parseAndDisplayLogs(lastParsedLogText);
     });
   }
 
-  // IP Filter live update
   if (ipFilterInput) {
-    ipFilterInput.addEventListener('input', function () {
+    ipFilterInput.addEventListener('input', () => {
       parseAndDisplayLogs(lastParsedLogText);
     });
   }
