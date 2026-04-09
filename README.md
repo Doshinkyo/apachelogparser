@@ -8,6 +8,7 @@ A simple web-based tool for parsing Apache log files and displaying the results 
 - Displays parsed log data in a table
 - Filter by IP address, error codes, and optional columns
 - Sort by date
+- Light and dark themes
 - Copy table data to clipboard or download as CSV
 - No server-side processing; all parsing is done in the browser
 
