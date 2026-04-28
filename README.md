@@ -12,7 +12,7 @@ A simple web-based tool for parsing Apache log files and displaying the results 
 - Copy table data to clipboard or download as CSV
 - No server-side processing; all parsing is done in the browser
 
-## Live Demo
+## Live Site
 
 [Try it online at apachelogparser.com](https://www.apachelogparser.com)
 
